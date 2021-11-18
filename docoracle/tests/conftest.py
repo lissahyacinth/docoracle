@@ -40,8 +40,13 @@ def simple_function() -> pathlib.PosixPath:
 
 
 @pytest.fixture()
-def typed_class() -> pathlib.PosixPath:
-    return files("docoracle.tests.resources").joinpath("typed_class.py")
+def param_typed_class() -> pathlib.PosixPath:
+    return files("docoracle.tests.resources").joinpath("param_typed_class.py")
+
+
+@pytest.fixture()
+def comment_typed_class() -> pathlib.PosixPath:
+    return files("docoracle.tests.resources").joinpath("comment_typed_class.py")
 
 
 @pytest.fixture()

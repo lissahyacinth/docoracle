@@ -1,7 +1,9 @@
 import sys
 import re
 import logging
-from typing import Optional, Final
+from typing import Optional, Final, Type
+
+from docoracle.blocks.type_block import NoTypeSpecified, TypeBlock
 
 
 LOGGER = logging.getLogger(__name__)
@@ -13,16 +15,24 @@ from docoracle.blocks import Parameter
 
 
 def _write_parameter(
-    parameters: Dict[str, Parameter], current_parameter: str, current_comment: List[str]
+    parameters: Dict[str, Parameter],
+    parameter_type: Optional[str],
+    current_parameter: str,
+    current_comment: List[str],
 ):
     parameters[current_parameter] = Parameter(
-        current_parameter, None, " ".join(current_comment)
+        current_parameter,
+        TypeBlock.from_string(parameter_type)
+        if parameter_type is not None
+        else TypeBlock(NoTypeSpecified),
+        " ".join(current_comment),
     )
 
 
 def split_parameter_comments(block: Iterator[str]) -> Tuple[str, Dict[str, Parameter]]:
     comment_block: List[str] = []
     current_parameter: Optional[str] = None
+    current_parameter_type: Optional[str] = None
     current_comment: List[str] = []
     double_dot_comment: bool = False
     parameters: Dict[str, Parameter] = {}
@@ -31,15 +41,32 @@ def split_parameter_comments(block: Iterator[str]) -> Tuple[str, Dict[str, Param
         if (
             len(line) == 0 or line.startswith(":param")
         ) and current_parameter is not None:
-            _write_parameter(parameters, current_parameter, current_comment)
+            _write_parameter(
+                parameters=parameters,
+                parameter_type=current_parameter_type,
+                current_parameter=current_parameter,
+                current_comment=current_comment,
+            )
             current_comment = []
             current_parameter = None
         if line.startswith(":param"):
             double_dot_comment = False
-            current_parameter = re.search(
-                r":param\s([a-zA-Z0-9\_\-]+)[\s\:]{1,2}", line
-            ).group(1)
-            split_comment = re.sub(f":?param\\s{current_parameter}:?", "", line)
+            parameter_match = re.search(
+                r":param\s([a-zA-Z0-9\_\-]+)\s*([\sa-zA-Z0-9]*)[\s]*:(.*)", line
+            )
+            if parameter_match is None:
+                # TODO: Fix This
+                pass
+            if (
+                parameter_match.group(2) is None
+                or len(parameter_match.group(2).strip()) == 0
+            ):
+                current_parameter = parameter_match.group(1)
+                current_parameter_type = None
+            else:
+                current_parameter = parameter_match.group(2)
+                current_parameter_type = parameter_match.group(1).strip()
+            split_comment = parameter_match.group(3)
             current_comment = [split_comment.strip()]
         elif len(line) == 0:
             double_dot_comment = False
@@ -55,6 +82,12 @@ def split_parameter_comments(block: Iterator[str]) -> Tuple[str, Dict[str, Param
         else:
             pass
     if current_parameter is not None:
-        _write_parameter(parameters, current_parameter, current_comment)
+        _write_parameter(
+            parameters, current_parameter_type, current_parameter, current_comment
+        )
     # TODO: Rewrite with context management
-    return "".join(comment_block).strip(), parameters
+    if len(comment_block) == 0:
+        comment_block = None
+    else:
+        comment_block = "".join(comment_block).strip()
+    return comment_block, parameters

@@ -41,7 +41,6 @@ def parse_file(filename: pathlib.Path) -> ModuleBlock:
         '', # TODO: Add Relative Name
         filename,
         items=list(map(_parse_item, ast_tree.body)),
-        links=[]
     )
                    
 

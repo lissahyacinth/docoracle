@@ -1,12 +1,12 @@
-class SimpleClass:
+class CommentTypedClass:
     """
-    This is my simple class!
+    This is my comment typed class!
 
     :param int A:
     :param float B:
     """
 
-    def __init__(self, A: int, B: float):
+    def __init__(self, A, B):
         self.A = A
         self.B = B
 

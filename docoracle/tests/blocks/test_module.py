@@ -1,5 +1,5 @@
 from docoracle.blocks import Parameter, Signature, TypeBlock
-from docoracle.parse.parse_module import _retrieve_file_ast_parse, parse_file
+from docoracle.parse.parse_module import parse_file
 
 
 def test_parse_module(simple_module):
@@ -10,14 +10,14 @@ def test_parse_module(simple_module):
     init_fn = next(mod_ast.classes()).methods[0]
     assert init_fn.signature == Signature(
         parameters=[
-            Parameter(name="self", type=TypeBlock(type=None), comment=""),
-            Parameter(name="A", type=TypeBlock(type=int), comment=""),
-            Parameter(name="B", type=TypeBlock(type=float), comment=""),
+            Parameter(name="self", type=TypeBlock(type=None), comment=None),
+            Parameter(name="A", type=TypeBlock(type=int), comment=None),
+            Parameter(name="B", type=TypeBlock(type=float), comment=None),
         ],
         result=TypeBlock(type=None),
     )
     method_1 = next(mod_ast.classes()).methods[1]
     assert method_1.signature == Signature(
-        [Parameter("self", TypeBlock(None), "")], TypeBlock(float)
+        [Parameter("self", TypeBlock(None), None)], TypeBlock(float)
     )
     assert method_1.comment_block == "Multiply internal numbers together"

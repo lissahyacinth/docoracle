@@ -27,6 +27,11 @@ class UnknownType:
 
 
 @dataclass
+class NoTypeSpecified:
+    pass
+
+
+@dataclass
 class TypeBlock:
     type: Union[
         None,
@@ -46,6 +51,7 @@ class TypeBlock:
         UserDefinedType,
         Enum,
         UnknownType,
+        NoTypeSpecified
     ]
 
     @staticmethod

@@ -5,8 +5,8 @@ class SimpleClass:
     """
     This is my simple class!
 
-    :param A int
-    :param B float
+    :param int A:
+    :param float B:
     """
 
     def __init__(self, A: int, B: float):

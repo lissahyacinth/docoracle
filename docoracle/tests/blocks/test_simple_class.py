@@ -13,9 +13,9 @@ def test_parse_class(simple_class):
     init_fn = parsed_class.methods[0]
     assert init_fn.signature == Signature(
         parameters=[
-            Parameter(name="self", type=TypeBlock(type=None), comment=""),
-            Parameter(name="A", type=TypeBlock(type=int), comment=""),
-            Parameter(name="B", type=TypeBlock(type=float), comment=""),
+            Parameter(name="self", type=TypeBlock(type=None), comment=None),
+            Parameter(name="A", type=TypeBlock(type=int), comment=None),
+            Parameter(name="B", type=TypeBlock(type=float), comment=None),
         ],
         result=TypeBlock(type=None),
     )

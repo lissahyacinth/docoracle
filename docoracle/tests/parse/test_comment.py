@@ -1,4 +1,5 @@
 from docoracle.blocks.parameters import Parameter
+from docoracle.blocks.type_block import NoTypeSpecified, TypeBlock
 from docoracle.parse.parse_function import split_parameter_comments
 
 
@@ -14,14 +15,16 @@ See :doc:`/blueprints` for more information."""
     expected_params = {
         "name": Parameter(
             "name",
-            None,
+            TypeBlock(NoTypeSpecified),
             "The name of the blueprint. Will be prepended to each endpoint name.",
         ),
         "import_name": Parameter(
             "import_name",
-            None,
+            TypeBlock(NoTypeSpecified),
             "The name of the blueprint package, usually ``__name__``. This helps locate the ``root_path`` for the blueprint.",
         ),
     }
+    print(params.items())
+    print(expected_params.items())
     assert all(a == b for (a, b) in zip(block.split(" "), expected_block.split(" ")))
     assert (params.items()) == (expected_params.items())
