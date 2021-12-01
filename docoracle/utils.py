@@ -1,9 +1,11 @@
-from typing import TypeVar, Optional
+import pathlib
+from typing import List, TypeVar, Optional
 
 from docoracle.blocks.type_block import TypeBlock
 
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 def str_coalesce(a: Optional[str], b: Optional[str]) -> Optional[str]:
     if a is not None and len(a.strip()) == 0:
@@ -35,3 +37,18 @@ def coalesce(a: Optional[T], b: Optional[T]) -> T:
             return b
         case None, None:
             raise ValueError(f"Parameters a and b were both None")
+
+
+def relative_module_path(loc: pathlib.Path, base_directory: pathlib.Path) -> List[str]:
+    path = "/".join(
+        filter(
+            lambda x: len(x.strip()) > 0,
+            str(loc)
+            .replace(str(base_directory), "")
+            .replace("__init__.py", "")
+            .split("/"),
+        )
+    )
+    if len(path) == 0:
+        return "/"
+    return path
