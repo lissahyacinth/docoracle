@@ -15,6 +15,7 @@ def test_function_pre_link_render(simple_function):
     ]
     function_ast = retrieve_file_ast_parse(simple_function).body[0]
     function_block = parse_function(function_ast)
+    print(function_block)
     for (line, actual_line) in zip(
         _render_function(function_block).split("\n"),
         expected_render,

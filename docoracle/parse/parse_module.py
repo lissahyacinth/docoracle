@@ -4,6 +4,11 @@ import pathlib
 import logging
 import toml
 import subprocess
+from docoracle.blocks.import_block import (
+    ModuleImportBlock,
+    PackageImportBlock,
+    parse_import,
+)
 
 from docoracle.blocks.items import (
     ClassBlock,
@@ -11,13 +16,14 @@ from docoracle.blocks.items import (
     parse_class,
     parse_function,
 )
+from docoracle.blocks.link_block import LinkContext
 
 from docoracle.parse import ast3_parse
 
-from typing import TYPE_CHECKING, Union, Optional
+from typing import TYPE_CHECKING, List, Union, Optional
 from functools import lru_cache
 
-from ast import ClassDef, Assign, FunctionDef, AST
+from ast import ClassDef, Assign, FunctionDef, AST, Import, ImportFrom
 
 if TYPE_CHECKING:
     from docoracle.blocks.parameters import Parameter
@@ -31,14 +37,22 @@ def retrieve_file_ast_parse(filename: pathlib.Path) -> Optional[AST]:
 
 
 def parse_item(
-    item: Union[ClassDef, FunctionDef, Assign]
-) -> Union[ClassBlock, FunctionBlock, Parameter]:
-    if isinstance(item, ClassDef):
-        return parse_class(item)
-    elif isinstance(item, FunctionDef):
-        return parse_function(item)
-    elif isinstance(item, Assign):
-        pass
+    item: Union[ClassDef, FunctionDef, Assign], context: LinkContext
+) -> Union[
+    ClassBlock,
+    FunctionBlock,
+    Parameter,
+    List[Union[PackageImportBlock, ModuleImportBlock]],
+]:
+    match item:
+        case ClassDef():
+            return parse_class(item)
+        case FunctionDef():
+            return parse_function(item)
+        case Import() | ImportFrom():
+            return parse_import(item, context.package, context.module)
+        case Assign():
+            pass
 
 
 def _is_root_dir(filename: pathlib.Path) -> bool:

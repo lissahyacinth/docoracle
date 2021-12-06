@@ -17,7 +17,9 @@ def _render_function(function_item: FunctionBlock) -> str:
     function_description.append(f"{function_item.signature}")
     function_description.append(f"## Parameters")
     for param in function_item.signature.parameters:
-        function_description.append(f"{param.name} : {param.type}")
+        function_description.append(
+            f"{param.name} : {param.unevaluated_type if param.type is None else param.type}"
+        )
         function_description.append(f"\t{param.comment}")
     function_description.append(f"## Description")
     function_description.append(f"{function_item.comment_block}")

@@ -23,10 +23,12 @@ def _write_parameter(
     current_comment: List[str],
 ):
     parameters[current_parameter] = Parameter(
-        current_parameter,
-        parameter_type if parameter_type is not None else TypeBlock(NoTypeSpecified),
-        None,
-        " ".join(current_comment),
+        name=current_parameter,
+        unevaluated_type=None,
+        type=parameter_type
+        if parameter_type is not None
+        else TypeBlock(NoTypeSpecified),
+        comment=" ".join(current_comment),
     )
 
 

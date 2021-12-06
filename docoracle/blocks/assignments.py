@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from docoracle.blocks.link_block import LinkContext
 
 from docoracle.blocks.type_block import TypeBlock
-from docoracle.blocks.import_block import ImportBlock, ModuleImportBlock
+from docoracle.blocks.import_block import ModuleImportBlock, PackageImportBlock
 from docoracle.blocks.items import FunctionBlock, ClassBlock
 from docoracle.discovery.paths import ItemPath
 
@@ -23,7 +23,7 @@ class AssignmentBlock:
         self,
         item_context: Dict[ItemPath, Union[FunctionBlock, ClassBlock, AssignmentBlock]],
         link_context: LinkContext,
-        imports: Dict[str, Union[ImportBlock, ModuleImportBlock]],
+        imports: Dict[str, Union[ModuleImportBlock, PackageImportBlock]],
     ) -> Set[Union[ItemPath, ModulePath]]:
         """
         Attempt to link all items below the present hierarchy.

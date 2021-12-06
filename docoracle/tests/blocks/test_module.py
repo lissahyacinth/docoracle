@@ -12,13 +12,11 @@ def test_parse_module(simple_module):
     assert init_fn.signature == Signature(
         parameters=[
             Parameter(name="self", type=None, comment=None),
-            Parameter(name="A", string_type='int', type=None, comment=None),
-            Parameter(name="B", string_type='float', type=None, comment=None),
+            Parameter(name="A", string_type="int", type=None, comment=None),
+            Parameter(name="B", string_type="float", type=None, comment=None),
         ],
         result=TypeBlock(type=None),
     )
     method_1 = next(mod_ast.classes()).methods[1]
-    assert method_1.signature == Signature(
-        [Parameter("self", None, None)], 'float'
-    )
+    assert method_1.signature == Signature([Parameter("self", None, None)], "float")
     assert method_1.comment_block == "Multiply internal numbers together"

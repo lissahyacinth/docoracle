@@ -1,5 +1,8 @@
 import pathlib
-from typing import List, TypeVar, Optional
+import functools
+
+from operator import iconcat, xor
+from typing import List, TypeVar, Optional, Any, Union
 
 from docoracle.blocks.type_block import TypeBlock
 
@@ -52,3 +55,14 @@ def relative_module_path(loc: pathlib.Path, base_directory: pathlib.Path) -> Lis
     if len(path) == 0:
         return "/"
     return path
+
+
+def _combine(acc: List, x: Union[List, Any]) -> List:
+    if isinstance(x, List):
+        return iconcat(acc, x)
+    else:
+        return iconcat(acc, [x])
+
+
+def flatten_list(x: List[List[Any]]) -> List[Any]:
+    return functools.reduce(_combine, x, [])
