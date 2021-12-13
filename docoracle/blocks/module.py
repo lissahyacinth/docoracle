@@ -22,19 +22,16 @@ from docoracle.discovery.paths import ModulePath, ItemPath
 from docoracle.parse.error import ParseError
 from docoracle.utils import flatten_list, relative_module_path
 
-from functools import reduce
+from functools import cached_property
 
 
 def parse_file(
     filename: pathlib.Path,
     package: Optional[str],
-    package_modules: Optional[Dict[ModulePath, ModuleBlock]] = None,
 ) -> ModuleBlock:
     ast_tree = retrieve_file_ast_parse(filename)
     if ast_tree is None:
         raise ParseError
-    if package_modules is None:
-        package_modules = {}
     package_name = package if package is not None else find_rel_package(filename)
     module_name = relative_module_path(filename, filename.parents[0])
     context_parse = functools.partial(
@@ -43,18 +40,18 @@ def parse_file(
     return ModuleBlock(
         name=filename.stem if filename.stem != "__init__" else filename.parents[-1],
         package=package_name,
-        relative_name=module_name,
+        relative_name=module_name if isinstance(module_name, list) else [module_name],
         filepath=filename,
         items={
-            item.name: item
+            item
             for item in flatten_list(
                 filter(
                     lambda x: x is not None, list(map(context_parse, ast_tree.body))
                 ),
             )
         },
-        package_modules=package_modules,
     )
+
 
 
 def _is_exported(item: Union[FunctionBlock, AssignmentBlock, ClassBlock]) -> bool:
@@ -75,103 +72,70 @@ class ModuleBlock:
     package: str
     relative_name: List[str]
     filepath: pathlib.Path
-    package_modules: Dict[ModulePath, ModuleBlock]
-    items: Dict[str, Union[ClassBlock, FunctionBlock, AssignmentBlock]] = field(
-        default_factory=dict
-    )
-    context: Dict[ItemPath, Union[FunctionBlock, ClassBlock, AssignmentBlock]] = field(
-        default_factory=dict
+    items: Set[Union[ClassBlock, FunctionBlock, AssignmentBlock]] = field(
+        default_factory=set
     )
 
-    def _import_context(
-        self,
-        marked_items: Set[ItemPath],
-        package_modules: Dict[ModulePath, ModuleBlock],
-    ) -> Dict[ItemPath, Union[FunctionBlock, ClassBlock, AssignmentBlock]]:
-        context: Dict[ItemPath, Union[FunctionBlock, ClassBlock, AssignmentBlock]] = {}
-        for item in marked_items:
-            block = package_modules.get(item.to_module())
-            for (_, item_value) in block.items.items():
-                context[item] = item_value
-        return context
+    def __hash__(self) -> int:
+        return hash(
+            tuple(
+                [
+                    self.name,
+                    self.package,
+                    self.filepath,
+                ]
+                + self.relative_name
+                + self.items
+            )
+        )
 
+    @cached_property
     def named_exports(
         self,
-    ) -> Dict[str, Union[ClassBlock, FunctionBlock, AssignmentBlock]]:
-        return {x.name: x for x in filter(_is_exported, self.items.values())}
+    ) -> Set[str]:
+        return set(x.name for x in filter(_is_exported, self.items))
 
     def classes(self) -> Iterator[ClassBlock]:
-        return iter(filter(lambda x: isinstance(x, ClassBlock), self.items.values()))
+        return iter(filter(lambda x: isinstance(x, ClassBlock), self.items))
 
     def functions(self) -> Iterator[FunctionBlock]:
-        return iter(filter(lambda x: isinstance(x, FunctionBlock), self.items.values()))
+        return iter(filter(lambda x: isinstance(x, FunctionBlock), self.items))
 
     def assignments(self) -> Iterator[AssignmentBlock]:
-        return iter(
-            filter(lambda x: isinstance(x, AssignmentBlock), self.items.values())
-        )
+        return iter(filter(lambda x: isinstance(x, AssignmentBlock), self.items))
 
-    def module_imports(self) -> Iterator[Union[ModuleImportBlock, PackageImportBlock]]:
+    @cached_property
+    def aliases(self) -> Dict[Union[ItemPath, ModulePath], Union[ItemPath, ModulePath]]:
+        """
+        TODO: Add in Assignments
+        """
+        return {
+            x.to_path(alias=True): x.to_path(alias=False)
+            for x in self.items
+            if (isinstance(x, ModuleImportBlock) or isinstance(x, PackageImportBlock))
+        }
 
-        # FIXME: Package is a list
-        # FIXME: This should return a dictionary for link with name/package
-        return iter(
-            filter(
-                lambda x: isinstance(x, ModuleImportBlock)
-                or isinstance(x, PackageImportBlock),
+    @cached_property
+    def imports(self) -> Set[ModulePath]:
+        return {
+            x.to_path()
+            for x in self.items.values()
+            if (isinstance(x, ModuleImportBlock) or isinstance(x, PackageImportBlock))
+        }
+
+    def package_imports(self) -> Set[ModulePath]:
+        return {
+            x
+            for x in filter(
+                lambda x: isinstance(x, PackageImportBlock),
                 self.items.values(),
             )
-        )
-
-    def __post_init__(self):
-        """
-        Perform Import Linking for Classes, Functions, Assignments, etc, within the Module.
-        This function mutates self.
-
-        Linking is the process of moving a typed variable from Strings to Context-Rich items.
-
-        Will be left in partial state unless all linked modules are linkable.
-
-        Performs a basic sweep of variables in the immediate module context.
-        """
-        # Modules to sweep
-        breakpoint()
-        link_context = LinkContext(package=self.package, module=self.relative_name)
-        marked_items = reduce(
-            lambda x, y: x | y,
-            filter(
-                lambda x: x is not None,
-                (
-                    [
-                        value.link(self.context, link_context, self.module_imports())
-                        for value in self.items.values()
-                    ]
-                ),
-            ),
-        )
-        while len(marked_items) > 0:
-            # Parse all modules that are relevant, and not currently parsed.
-            for module_path in [
-                item.to_module()
-                for item in marked_items
-                if item.to_module() not in self.package_modules
-            ]:
-                parsed_module = parse_file(
-                    module_path.rel_path(), package_modules=self.package_modules
-                )
-                self.package_modules[module_path] = parsed_module
-            self.context |= self._import_context(marked_items, self.package_modules)
-            marked_items = set(
-                [
-                    value.link(self.context, link_context, self.module_imports())
-                    for value in self.items.values()
-                ]
-            )
+        }
 
     def __str__(self):
         return (
             f"ModuleBlock (\n"
             f"\t * name={self.name}\n"
             f"\t * classes={self.classes}\n"
-            f"\t * items={self.items.items()}\n"
+            f"\t * items={self.items}\n"
         )

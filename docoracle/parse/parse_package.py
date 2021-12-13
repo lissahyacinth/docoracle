@@ -36,7 +36,4 @@ def initialize_package(package: UninitializedPackageBlock) -> PackageBlock:
     if package.location is None:
         raise RuntimeError("Cannot parse Module without location")
     modules = parse_package(package.location)
-    items = {module.name: module.named_exports() for module in modules}
-    return PackageBlock(
-        name=package.name, version=package.version, items=items, modules=modules
-    )
+    return PackageBlock(name=package.name, version=package.version, modules=modules)

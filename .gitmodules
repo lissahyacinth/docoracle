@@ -1,0 +1,3 @@
+[submodule "docoracle/typeshed_fallback"]
+	path = docoracle/typeshed_fallback
+	url = https://github.com/python/typeshed

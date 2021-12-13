@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import ast
 
 __all__ = ["ClassBlock", "FunctionBlock"]
 
@@ -14,22 +15,15 @@ from ast import (
     AnnAssign,
     Expr,
     Constant,
-    Name as ast_Name,
+    Name as ast_Name
 )
 from docoracle.blocks.type_block import TypeBlock
-from docoracle.utils import coalesce, flatten_list, type_coalesce, str_coalesce
+from docoracle.utils import coalesce, flatten_list, str_coalesce
 from docoracle.parse.parse_parameter import split_parameter_comments
 from docoracle.blocks.parameters import (
     Parameter,
     Signature,
 )
-
-if TYPE_CHECKING:
-    from docoracle.blocks.link_block import LinkContext
-    from docoracle.blocks.import_block import PackageImportBlock
-    from docoracle.discovery.paths import ItemPath, ModulePath
-    from docoracle.blocks.import_block import ModuleImportBlock
-    from docoracle.blocks.assignments import AssignmentBlock
 
 
 LOGGER = logging.getLogger(__name__)
@@ -43,7 +37,10 @@ def _function_comment(
         if isinstance(function_constant, Expr):
             function_val = function_constant.value
             if isinstance(function_val, Constant):
-                return split_parameter_comments(function_val.value.strip().split("\n"))
+                if type(function_val.value) is str:
+                    return split_parameter_comments(function_val.value.strip().split("\n"))
+                else:
+                    return None
     except IndexError:
         return None
     return None
@@ -77,7 +74,6 @@ def _method_arguments(
 ):
     if not isinstance(arguments, list):
         arguments = [arguments]
-    # breakpoint()
     return [
         _combine_parameters(
             parameters.get(arg.arg, None),
@@ -126,7 +122,7 @@ def _is_comment(ast_item: Expr) -> bool:
 def _retrieve_comment(
     element: Expr,
 ) -> Optional[Tuple[str, Dict[str, Parameter]]]:
-    if not _is_comment(element):
+    if not _is_comment(element) or element.value.value is None:
         return None
     else:
         return split_parameter_comments(element.value.value.split("\n"))
@@ -140,6 +136,9 @@ def _parse_assignments(assignments: Iterator[Assign]) -> List[List[Parameter]]:
     # TODO: Deal with Tuple case (a, b = b, a) and ensure assignment
         can be tracked if necessary
     """
+    import ast
+    for a in assignments:
+        print(ast.dump(a))
     return flatten_list(
         [
             [
@@ -161,6 +160,7 @@ def _parse_annotated_assignments(
     """
     AnnAssign(expr target, expr annotation, expr? value, int simple)
     """
+    LOGGER.info(f"Evaluating Parameter {assignments=}")
     return [
         Parameter(
             name=a.target.id,
@@ -178,17 +178,10 @@ class FunctionBlock:
     signature: Signature
     comment_block: Optional[str]
 
-    def link(
-        self,
-        item_context: Dict[ItemPath, Union[FunctionBlock, ClassBlock, AssignmentBlock]],
-        link_context: LinkContext,
-        imports: Dict[str, Union[ModuleImportBlock, PackageImportBlock]],
-    ) -> Set[Union[ItemPath, ModulePath]]:
-        LOGGER.warning(f"Linking FunctionBlock {self.name}")
-        return self.signature.link(item_context, link_context, imports)
-
-    def is_linked(self) -> bool:
-        return self.signature.is_linked()
+    def __hash__(self) -> int:
+        return hash(
+            tuple([self.name, self.signature, self.comment_block] + list(self.lines))
+        )
 
 
 @dataclass
@@ -199,6 +192,16 @@ class ClassBlock:
     fields: List[Parameter]
     methods: List[FunctionBlock]
     _decorators: List[str]
+
+    def __hash__(self) -> int:
+        return hash(
+            tuple(
+                [self.name, self.comment_block, self.lines]
+                + self.fields
+                + self.methods
+                + self._decorators
+            )
+        )
 
     def __post_init__(self):
         if "dataclass" in self._decorators:
@@ -213,23 +216,6 @@ class ClassBlock:
                 comment_block=None,
             )
         )
-
-    def link(
-        self,
-        item_context: Dict[ItemPath, Union[FunctionBlock, ClassBlock, AssignmentBlock]],
-        link_context: LinkContext,
-        imports: Dict[str, Union[ModuleImportBlock, PackageImportBlock]],
-    ) -> Set[Union[ItemPath, ModulePath]]:
-        LOGGER.warning(f"Linking {self.name} Class")
-        unlinked_items: Set[Union[ItemPath, ModulePath]] = set()
-        for field in filter(lambda x: not x.is_linked, self.fields):
-            unlinked_items = unlinked_items | field.link(
-                item_context, link_context, imports
-            )
-        for method in filter(lambda x: not x.is_linked, self.methods):
-            unlinked_items = unlinked_items | method.link(
-                item_context, link_context, imports
-            )
 
 
 def parse_class(item: ClassDef) -> ClassBlock:

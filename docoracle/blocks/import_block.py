@@ -1,17 +1,35 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union, TYPE_CHECKING, Dict, Union, Set, List
+from typing import Optional, Tuple, Union, TYPE_CHECKING, Dict, Union, List
 from ast import Import, ImportFrom
 
-from docoracle.blocks.link_block import LinkContext
-from docoracle.discovery.paths import ModulePath
-from docoracle.discovery.paths import ItemPath
+from docoracle.discovery.paths import ItemPath, ModulePath, find_resource_path
 
 if TYPE_CHECKING:
     from docoracle.discovery.paths import ModulePath
-    from docoracle.blocks.items import FunctionBlock, ClassBlock
-    from docoracle.blocks.assignments import AssignmentBlock
+
+
+@dataclass
+class Aliases:
+    items: Dict[str, str]
+
+    def get(self, id: str) -> Optional[ModulePath]:
+        return self.items.get(id, id)
+
+    def combine(self, items: Union[Aliases, Dict[str, str]]) -> None:
+        if isinstance(items, Aliases):
+            self.items = self.items | items.items
+        else:
+            self.items = self.items | items
+
+
+@dataclass
+class ImportCandidates:
+    items: Dict[str, ModulePath]
+
+    def get(self, id: str) -> Optional[ModulePath]:
+        return self.items.get(id, None)
 
 
 @dataclass
@@ -20,40 +38,28 @@ class PackageImportBlock:
     alias: str
     package: str
 
-    def to_path(self) -> ModulePath:
-        return ModulePath(package=self.package, module=[])
+    def to_path(self, alias: bool = False) -> ModulePath:
+        return find_resource_path(package=self.package, alias=self.alias if alias else None, modules=[])
 
-    def link(
-        self,
-        item_context: Dict[ItemPath, Union[FunctionBlock, ClassBlock, AssignmentBlock]],
-        link_context: LinkContext,
-        imports: Dict[str, Union[ModuleImportBlock, PackageImportBlock]],
-    ) -> Set[Union[ItemPath, ModulePath]]:
-        """
-        Attempt to link all items below the present hierarchy.
-
-        If an item cannot be linked, return the path to the item to be searched.
-        If an item cannot be linked, and there's no clues to where it came from,
-        return all ModulePaths that are targeted with an import star.
-        """
-        return set()
-
-    def is_linked(self) -> bool:
-        return True
+    def __hash__(self) -> int:
+        return hash(tuple([self.name, self.alias, self.package]))
 
 
 @dataclass
 class ModuleImportBlock(PackageImportBlock):
     module: List[str]
 
-    def to_path(self) -> ModulePath:
-        return ModulePath(package=self.package, module=self.module)
+    def to_path(self, alias: bool = False) -> Union[ModulePath, ItemPath]:
+        return find_resource_path(package=self.package, alias=self.alias if alias else None, modules=self.module)
+
+    def __hash__(self) -> int:
+        return hash(tuple([self.name, self.alias, self.package] + self.module))
 
 
 def _split_module(term: str) -> Tuple[str, Optional[List[str]]]:
     terms = term.split(".")
     if len(terms) == 1:
-        return terms, None
+        return terms[0], None
     return terms.pop(0), terms
 
 
@@ -70,14 +76,20 @@ def parse_import(
                         ModuleImportBlock(
                             package=package,
                             module=module,
-                            alias=alias.asname,
+                            alias=alias.asname
+                            if alias.asname is not None
+                            else alias.name,
                             name=alias.name,
                         )
                     )
                 else:
                     res.append(
                         PackageImportBlock(
-                            package=package, alias=alias.asname, name=alias.name
+                            package=package,
+                            alias=alias.asname
+                            if alias.asname is not None
+                            else alias.name,
+                            name=alias.name,
                         )
                     )
             return res
@@ -90,7 +102,10 @@ def parse_import(
                 package, module = _split_module(item.module)
             return [
                 ModuleImportBlock(
-                    alias=alias.asname, package=package, module=module, name=alias.name
+                    alias=alias.asname if alias.asname is not None else alias.name,
+                    package=package,
+                    module=[] if module is None else module,
+                    name=alias.name,
                 )
                 for alias in item.names
             ]

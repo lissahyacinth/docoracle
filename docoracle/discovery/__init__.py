@@ -1,16 +1,18 @@
-import pathlib
+import sys
+import itertools
 
 from typing import List, Dict, Tuple, Set, Optional
 from importlib.metadata import requires, packages_distributions, version, distribution
 from functools import lru_cache
 from dataclasses import dataclass
+from importlib.machinery import ModuleSpec
 
 
 @dataclass
 class UninitializedPackageBlock:
     name: str
     version: version
-    location: Optional[pathlib.Path]
+    location: Optional[ModuleSpec]
 
 
 def simple_requires(package: str) -> List[str]:
@@ -25,15 +27,11 @@ def _add_version(package: str) -> Tuple[str, version]:
     return (package, version(package))
 
 
-def _find_location(package_name: str) -> Optional[pathlib.Path]:
+def _find_location(package_name: str) -> Optional[ModuleSpec]:
     return next(
-        map(
-            lambda x: x.locate().parent,
-            filter(
-                lambda x: str(x)
-                in [f"{package_name}/__init__.py", f"site-packages/{package_name}.py"],
-                distribution(package_name).files,
-            ),
+        filter(
+            lambda x: x is not None,
+            (meta.find_spec(package_name) for meta in sys.meta_path),
         ),
         None,
     )
@@ -48,5 +46,11 @@ def parse_package_block(package: Tuple[str, version]) -> UninitializedPackageBlo
 
 @lru_cache()
 def get_local_packages() -> Dict[str, UninitializedPackageBlock]:
-    packages = map(parse_package_block, map(_add_version, installed_packages()))
+    packages = map(
+        parse_package_block,
+        itertools.chain(
+            map(_add_version, installed_packages()),
+            ((x, None) for x in sys.stdlib_module_names),
+        ),
+    )
     return {package.name: package for package in packages}

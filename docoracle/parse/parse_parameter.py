@@ -2,6 +2,7 @@ __all__ = ["split_parameter_comment"]
 
 import sys
 import re
+import ast
 import logging
 from typing import Optional, Final
 
@@ -24,10 +25,9 @@ def _write_parameter(
 ):
     parameters[current_parameter] = Parameter(
         name=current_parameter,
-        unevaluated_type=None,
-        type=parameter_type
-        if parameter_type is not None
-        else TypeBlock(NoTypeSpecified),
+        unevaluated_type=ast.parse(f"{current_parameter}: {parameter_type}")
+        .body[0]
+        .annotation,
         comment=" ".join(current_comment),
     )
 

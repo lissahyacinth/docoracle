@@ -8,7 +8,6 @@ import logging
 
 from enum import Enum
 from typing import (
-    TYPE_CHECKING,
     Sequence,
     Tuple,
     List,
@@ -68,6 +67,9 @@ class TypeBlock:
         UnknownType,
         NoTypeSpecified,
     ]
+
+    def __hash__(self) -> int:
+        return hash(self.type)
 
     @staticmethod
     def from_string(x: str) -> TypeBlock:
