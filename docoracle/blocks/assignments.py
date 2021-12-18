@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from docoracle.blocks.type_block import TypeBlock
 
+
 @dataclass
 class AssignmentBlock:
     name: str

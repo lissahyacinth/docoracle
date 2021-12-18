@@ -1,10 +1,10 @@
 from docoracle.blocks.type_block import TypeBlock
-from docoracle.blocks.module import parse_file
+from docoracle.blocks.module import parse_module
 from docoracle.blocks.parameters import Parameter, Signature
 
 
 def test_parse_module(simple_module):
-    mod_ast = parse_file(simple_module, package="None")
+    mod_ast = parse_module(simple_module, package="None")
     assert mod_ast.name == "simple_module"
     assert next(mod_ast.classes()).name == "SimpleClass"
     assert next(mod_ast.classes()).comment_block == "This is my simple class!"

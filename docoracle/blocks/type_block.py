@@ -8,6 +8,7 @@ import logging
 
 from enum import Enum
 from typing import (
+    TYPE_CHECKING,
     Sequence,
     Tuple,
     List,
@@ -22,12 +23,23 @@ from dataclasses import dataclass
 
 from docoracle.discovery.paths import ItemPath
 
+if TYPE_CHECKING:
+    from docoracle.blocks.items import ClassBlock
+
 LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
-class UserDefinedType(ItemPath):
-    name: str
+class UserDefinedType:
+    path: ItemPath
+    item: ClassBlock
+
+    @staticmethod
+    def from_item_path(path: ItemPath, block: ClassBlock):
+        return UserDefinedType(
+            path=path,
+            item=block,
+        )
 
 
 @dataclass

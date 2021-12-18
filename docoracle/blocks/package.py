@@ -1,12 +1,18 @@
+from __future__ import annotations
+
 __all__ = ["PackageBlock"]
 
 import logging
-import sys
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union, Set
 from importlib.metadata import version
-from docoracle.blocks.module import ModuleBlock, parse_file
-from docoracle.discovery.paths import ItemPath, ModulePath, find_resource_path
-from docoracle.discovery import UninitializedPackageBlock, get_local_packages
+from docoracle.discovery.paths import ModulePath
+from docoracle.blocks.module import (
+    ModuleBlock,
+    parse_module,
+    ReferencedModules,
+    ReferenceTable,
+)
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -23,43 +29,30 @@ class PackageBlock:
         self.modules = modules
 
 
-ReferenceTable = Dict[Union[ModulePath, ItemPath], Union[ModulePath, ItemPath]]
-ReferencedModules = Dict[ModulePath, ModuleBlock]
-
-
 def create_reference_table(
     modules: List[ModulePath],
     reference_table: Optional[ReferenceTable] = None,
     linked_modules: Optional[ReferencedModules] = None,
-    local_packages: Dict[str, UninitializedPackageBlock] = get_local_packages(),
 ) -> Tuple[ReferenceTable, ReferencedModules]:
     if reference_table is None:
         reference_table = {}
     if linked_modules is None:
         linked_modules = {}
-    for module in [l for l in modules if l not in linked_modules]:
-        local_package = local_packages[module.package]
-        if local_package.location is None:
-            LOGGER.error(f"Cannot find location for {local_package}")
-            exit(-1)
-        print(local_package)
-        print(local_package.location)
-        linked_modules[module] = parse_file(module.rel_path, package=module.package)
-        unlinked_modules = []
+    for module in modules:
+        if module not in linked_modules:
+            linked_modules[module] = parse_module(module)
+        unlinked_modules: Set[ModulePath] = set([])
         for (aliased_module_path, module_path) in linked_modules[
             module
         ].aliases.items():
-            reference_table[aliased_module_path] = module_path
-            unlinked_modules += [module_path]
-
-        create_reference_table(
-            list(set(unlinked_modules)), reference_table, linked_modules, local_packages
+            if (
+                aliased_module_path not in reference_table
+                and aliased_module_path.alias != module_path.alias
+            ):
+                reference_table[aliased_module_path] = module_path
+            if module_path not in linked_modules:
+                unlinked_modules = unlinked_modules | set([module_path])
+        reference_table, linked_modules = create_reference_table(
+            list(set(unlinked_modules)), reference_table, linked_modules
         )
     return (reference_table, linked_modules)
-
-
-if __name__ == "__main__":
-    
-    rt, lm = create_reference_table([find_resource_path("typing", [], None)])
-    print(rt)
-    print(lm.keys())

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import logging
-import ast
+
+from docoracle.discovery.paths import ModulePath
+from docoracle.blocks.parameters import as_base_type
 
 __all__ = ["ClassBlock", "FunctionBlock"]
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, List, Set, Tuple, Optional, Union, Dict, Iterator
+from typing import TYPE_CHECKING, List, Tuple, Optional, Union, Dict, Iterator
 from ast import (
     arguments as ast_arguments,
     ClassDef,
@@ -15,8 +17,11 @@ from ast import (
     AnnAssign,
     Expr,
     Constant,
-    Name as ast_Name
+    Name as ast_Name,
 )
+
+if TYPE_CHECKING:
+    from docoracle.blocks.module import ReferenceTable, ReferencedModules
 from docoracle.blocks.type_block import TypeBlock
 from docoracle.utils import coalesce, flatten_list, str_coalesce
 from docoracle.parse.parse_parameter import split_parameter_comments
@@ -38,7 +43,9 @@ def _function_comment(
             function_val = function_constant.value
             if isinstance(function_val, Constant):
                 if type(function_val.value) is str:
-                    return split_parameter_comments(function_val.value.strip().split("\n"))
+                    return split_parameter_comments(
+                        function_val.value.strip().split("\n")
+                    )
                 else:
                     return None
     except IndexError:
@@ -107,9 +114,9 @@ def parse_function(
         (item.lineno, item.end_lineno),
         Signature(
             _method_arguments(function_parameters, item.args.args),
-            item.returns.id
+            as_base_type(item.returns.id)
             if isinstance(item.returns, ast_Name)
-            else TypeBlock(None),  # TODO: Type Inference
+            else None,
         ),
         block_comment,
     )
@@ -122,7 +129,11 @@ def _is_comment(ast_item: Expr) -> bool:
 def _retrieve_comment(
     element: Expr,
 ) -> Optional[Tuple[str, Dict[str, Parameter]]]:
-    if not _is_comment(element) or element.value.value is None:
+    if (
+        not _is_comment(element)
+        or element.value.value is None
+        or element.value.value is Ellipsis
+    ):
         return None
     else:
         return split_parameter_comments(element.value.value.split("\n"))
@@ -136,9 +147,6 @@ def _parse_assignments(assignments: Iterator[Assign]) -> List[List[Parameter]]:
     # TODO: Deal with Tuple case (a, b = b, a) and ensure assignment
         can be tracked if necessary
     """
-    import ast
-    for a in assignments:
-        print(ast.dump(a))
     return flatten_list(
         [
             [
@@ -183,6 +191,14 @@ class FunctionBlock:
             tuple([self.name, self.signature, self.comment_block] + list(self.lines))
         )
 
+    def link(
+        self,
+        module: ModulePath,
+        reference_table: ReferenceTable,
+        referenced_modules: ReferencedModules,
+    ):
+        self.signature.link(module, reference_table, referenced_modules)
+
 
 @dataclass
 class ClassBlock:
@@ -216,6 +232,17 @@ class ClassBlock:
                 comment_block=None,
             )
         )
+
+    def link(
+        self,
+        module: ModulePath,
+        reference_table: ReferenceTable,
+        referenced_modules: ReferencedModules,
+    ):
+        for item in self.fields:
+            item.link(module, reference_table, referenced_modules)
+        for item in self.methods:
+            item.link(module, reference_table, referenced_modules)
 
 
 def parse_class(item: ClassDef) -> ClassBlock:

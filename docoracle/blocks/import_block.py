@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from os import name
 from typing import Optional, Tuple, Union, TYPE_CHECKING, Dict, Union, List
 from ast import Import, ImportFrom
 
@@ -39,7 +40,9 @@ class PackageImportBlock:
     package: str
 
     def to_path(self, alias: bool = False) -> ModulePath:
-        return find_resource_path(package=self.package, alias=self.alias if alias else None, modules=[])
+        return find_resource_path(
+            package=self.package, alias=self.alias if alias else None, modules=[]
+        )
 
     def __hash__(self) -> int:
         return hash(tuple([self.name, self.alias, self.package]))
@@ -50,7 +53,11 @@ class ModuleImportBlock(PackageImportBlock):
     module: List[str]
 
     def to_path(self, alias: bool = False) -> Union[ModulePath, ItemPath]:
-        return find_resource_path(package=self.package, alias=self.alias if alias else None, modules=self.module)
+        return find_resource_path(
+            package=self.package,
+            alias=self.alias if alias else None,
+            modules=self.module,
+        )
 
     def __hash__(self) -> int:
         return hash(tuple([self.name, self.alias, self.package] + self.module))
@@ -75,7 +82,7 @@ def parse_import(
                     res.append(
                         ModuleImportBlock(
                             package=package,
-                            module=module,
+                            module=module if isinstance(module, List) else [module],
                             alias=alias.asname
                             if alias.asname is not None
                             else alias.name,
@@ -100,6 +107,10 @@ def parse_import(
                 module = current_module
             else:
                 package, module = _split_module(item.module)
+            if module is None:
+                module = []
+            elif not isinstance(module, List):
+                module = [module]
             return [
                 ModuleImportBlock(
                     alias=alias.asname if alias.asname is not None else alias.name,

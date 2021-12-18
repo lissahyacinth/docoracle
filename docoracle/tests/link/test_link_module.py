@@ -1,9 +1,11 @@
-import pathlib
-from docoracle.blocks.module import parse_file
+from docoracle.blocks.module import parse_module
+from docoracle.blocks.package import create_reference_table
+from docoracle.discovery.paths import find_resource_path
 
 
-def test_parse_module():
-    module_block = parse_file(
-        pathlib.Path("/home/eden/GitHub/docoracle/flask/src/flask/app.py"),
-        package="flask",
-    )
+if __name__ == "__main__":
+    module_path = find_resource_path("typing", [], None)
+    rt, rm = create_reference_table([module_path])
+    module_block = parse_module(module_path)
+    module_block.link(rt, rm)
+    breakpoint()

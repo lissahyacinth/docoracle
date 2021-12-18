@@ -6,9 +6,6 @@ import ast
 import logging
 from typing import Optional, Final
 
-from docoracle.blocks.type_block import NoTypeSpecified, TypeBlock
-
-
 LOGGER = logging.getLogger(__name__)
 
 PY_MINOR_VERSION: Final = sys.version_info[1]

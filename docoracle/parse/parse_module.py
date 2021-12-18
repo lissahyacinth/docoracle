@@ -16,7 +16,7 @@ from docoracle.blocks.items import (
     parse_class,
     parse_function,
 )
-from docoracle.blocks.link_block import LinkContext
+from docoracle.discovery.paths import ModulePath
 
 from docoracle.parse import ast3_parse
 
@@ -37,7 +37,7 @@ def retrieve_file_ast_parse(filename: pathlib.Path) -> Optional[AST]:
 
 
 def parse_item(
-    item: Union[ClassDef, FunctionDef, Assign], context: LinkContext
+    item: Union[ClassDef, FunctionDef, Assign, Import, ImportFrom], path: ModulePath
 ) -> Union[
     ClassBlock,
     FunctionBlock,
@@ -50,7 +50,7 @@ def parse_item(
         case FunctionDef():
             return parse_function(item)
         case Import() | ImportFrom():
-            return parse_import(item, context.package, context.module)
+            return parse_import(item, path.package, path.module)
         case Assign():
             pass
 

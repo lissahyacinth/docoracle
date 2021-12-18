@@ -1,57 +1,43 @@
 from __future__ import annotations
-import functools
 
 
 __all__ = ["ModuleBlock"]
 
-import pathlib
 
 from dataclasses import dataclass, field
-from typing import Dict, Iterator, List, Set, Union, Optional
+from typing import Dict, Iterator, Set, Union, Optional
 from docoracle.blocks.items import ClassBlock, FunctionBlock
 from docoracle.blocks.import_block import ModuleImportBlock, PackageImportBlock
-from docoracle.blocks.link_block import LinkContext
 from docoracle.parse.error import ParseError
 from docoracle.parse.parse_module import (
     parse_item,
-    find_rel_package,
     retrieve_file_ast_parse,
 )
 from docoracle.blocks.assignments import AssignmentBlock
 from docoracle.discovery.paths import ModulePath, ItemPath
 from docoracle.parse.error import ParseError
-from docoracle.utils import flatten_list, relative_module_path
+from docoracle.utils import flatten_list
 
-from functools import cached_property
+from functools import cached_property, partial
 
 
-def parse_file(
-    filename: pathlib.Path,
-    package: Optional[str],
+def parse_module(
+    module: ModulePath,
 ) -> ModuleBlock:
-    ast_tree = retrieve_file_ast_parse(filename)
+    ast_tree = retrieve_file_ast_parse(module.rel_path)
     if ast_tree is None:
         raise ParseError
-    package_name = package if package is not None else find_rel_package(filename)
-    module_name = relative_module_path(filename, filename.parents[0])
-    context_parse = functools.partial(
-        parse_item, context=LinkContext(package=package_name, module=module_name)
-    )
+    parse = partial(parse_item, path=module)
     return ModuleBlock(
-        name=filename.stem if filename.stem != "__init__" else filename.parents[-1],
-        package=package_name,
-        relative_name=module_name if isinstance(module_name, list) else [module_name],
-        filepath=filename,
+        name=module.module[-1] if len(module.module) > 0 else None,
+        path=module,
         items={
             item
             for item in flatten_list(
-                filter(
-                    lambda x: x is not None, list(map(context_parse, ast_tree.body))
-                ),
+                filter(lambda x: x is not None, list(map(parse, ast_tree.body))),
             )
         },
     )
-
 
 
 def _is_exported(item: Union[FunctionBlock, AssignmentBlock, ClassBlock]) -> bool:
@@ -68,10 +54,8 @@ def _is_exported(item: Union[FunctionBlock, AssignmentBlock, ClassBlock]) -> boo
 
 @dataclass
 class ModuleBlock:
-    name: str
-    package: str
-    relative_name: List[str]
-    filepath: pathlib.Path
+    name: Optional[str]
+    path: ModulePath
     items: Set[Union[ClassBlock, FunctionBlock, AssignmentBlock]] = field(
         default_factory=set
     )
@@ -81,10 +65,8 @@ class ModuleBlock:
             tuple(
                 [
                     self.name,
-                    self.package,
-                    self.filepath,
+                    self.path,
                 ]
-                + self.relative_name
                 + self.items
             )
         )
@@ -123,6 +105,11 @@ class ModuleBlock:
             if (isinstance(x, ModuleImportBlock) or isinstance(x, PackageImportBlock))
         }
 
+    def fetch_item(
+        self, item: ItemPath
+    ) -> Union[None, ClassBlock, FunctionBlock, AssignmentBlock]:
+        return next((i for i in self.items if i == item), None)
+
     def package_imports(self) -> Set[ModulePath]:
         return {
             x
@@ -139,3 +126,23 @@ class ModuleBlock:
             f"\t * classes={self.classes}\n"
             f"\t * items={self.items}\n"
         )
+
+    def link(
+        self,
+        reference_table: ReferenceTable,
+        referenced_modules: ReferencedModules,
+    ):
+        for item in self.items:
+            match item:
+                case PackageImportBlock() | ModuleImportBlock():
+                    pass
+                case _:
+                    item.link(
+                        module=self.path,
+                        reference_table=reference_table,
+                        referenced_modules=referenced_modules,
+                    )
+
+
+ReferenceTable = Dict[Union[ModulePath, ItemPath], Union[ModulePath, ItemPath]]
+ReferencedModules = Dict[ModulePath, ModuleBlock]
