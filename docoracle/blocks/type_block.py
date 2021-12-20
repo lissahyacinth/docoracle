@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+
 __all__ = ["TypeBlock"]
 
 
+import logging
+
 from enum import Enum
 from typing import (
+    TYPE_CHECKING,
     Sequence,
     Tuple,
     List,
@@ -16,9 +20,28 @@ from typing import (
 )
 from dataclasses import dataclass
 
+
+from docoracle.discovery.paths import ItemPath
+
+if TYPE_CHECKING:
+    from docoracle.blocks.items import ClassBlock
+
+LOGGER = logging.getLogger(__name__)
+
+
+
+
 @dataclass
 class UserDefinedType:
-    name: str
+    path: ItemPath
+    item: ClassBlock
+
+    @staticmethod
+    def from_item_path(path: ItemPath, block: ClassBlock):
+        return UserDefinedType(
+            path=path,
+            item=block,
+        )
 
 
 @dataclass
@@ -30,6 +53,14 @@ class UnknownType:
 class NoTypeSpecified:
     pass
 
+
+@dataclass
+class SelfType:
+    name: str
+
+    def __hash__(self) -> int:
+        return hash(self.name)
+    
 
 @dataclass
 class TypeBlock:
@@ -51,30 +82,26 @@ class TypeBlock:
         UserDefinedType,
         Enum,
         UnknownType,
-        NoTypeSpecified
+        NoTypeSpecified,
     ]
+
+    def __hash__(self) -> int:
+        return hash(self.type)
 
     @staticmethod
     def from_string(x: str) -> TypeBlock:
         match x:
-            case '' | None:
+            case "" | None:
                 return TypeBlock(UnknownType)
-            case 'float':
+            case "float":
                 return TypeBlock(float)
-            case 'int':
+            case "int":
                 return TypeBlock(int)
+            case "str":
+                return TypeBlock(str)
+            case "bool":
+                return (TypeBlock(bool),)
+            case "Sequence":
+                return TypeBlock(Sequence)
             case _:
                 return TypeBlock(UserDefinedType(x))
-
-    def try_link(self) -> str:
-        match self.type:
-            case int():
-                return "[int](https://docs.python.org/3/library/functions.html#int)"
-            case float():
-                return "[float](https://docs.python.org/3/library/functions.html#float)"
-            case str():
-                return "[str](https://docs.python.org/3/library/functions.html#str)"
-            case UnknownType(type_name):
-                return f"{type_name}"
-            case _:
-                return "A Type I'll fill in later"

@@ -1,17 +1,17 @@
+__all__ = ["split_parameter_comment"]
+
 import sys
 import re
+import ast
 import logging
-from typing import Optional, Final, Type
-
-from docoracle.blocks.type_block import NoTypeSpecified, TypeBlock
-
+from typing import Optional, Final
 
 LOGGER = logging.getLogger(__name__)
 
 PY_MINOR_VERSION: Final = sys.version_info[1]
 
 from typing import Iterator, List, Dict, Tuple
-from docoracle.blocks import Parameter
+from docoracle.blocks.parameters import Parameter
 
 
 def _write_parameter(
@@ -21,15 +21,17 @@ def _write_parameter(
     current_comment: List[str],
 ):
     parameters[current_parameter] = Parameter(
-        current_parameter,
-        TypeBlock.from_string(parameter_type)
-        if parameter_type is not None
-        else TypeBlock(NoTypeSpecified),
-        " ".join(current_comment),
+        name=current_parameter,
+        unevaluated_type=ast.parse(f"{current_parameter}: {parameter_type}")
+        .body[0]
+        .annotation,
+        comment=" ".join(current_comment),
     )
 
 
-def split_parameter_comments(block: Iterator[str]) -> Tuple[str, Dict[str, Parameter]]:
+def split_parameter_comments(
+    block: Iterator[str],
+) -> Tuple[str, Dict[str, Parameter]]:
     comment_block: List[str] = []
     current_parameter: Optional[str] = None
     current_parameter_type: Optional[str] = None

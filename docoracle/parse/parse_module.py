@@ -1,47 +1,90 @@
+from __future__ import annotations
+
 import pathlib
 import logging
-from docoracle.blocks import ClassBlock, FunctionBlock, ModuleBlock, Parameter
+import toml
+import subprocess
+from docoracle.blocks.import_block import (
+    ModuleImportBlock,
+    PackageImportBlock,
+    parse_import,
+)
+
+from docoracle.blocks.items import (
+    ClassBlock,
+    FunctionBlock,
+    parse_class,
+    parse_function,
+)
+from docoracle.discovery.paths import ModulePath
 
 from docoracle.parse import ast3_parse
-from docoracle.parse.parse_class import parse_class
-from typing import Union, Optional
 
-from ast import (
-    ClassDef,
-    Assign,
-    FunctionDef,
-    AST
-)
-from docoracle.parse.error import ParseError
+from typing import TYPE_CHECKING, List, Union, Optional
+from functools import lru_cache
 
-from docoracle.parse.parse_function import parse_function
+from ast import ClassDef, Assign, FunctionDef, AST, Import, ImportFrom
+
+if TYPE_CHECKING:
+    from docoracle.blocks.parameters import Parameter
 
 
 LOGGER = logging.getLogger(__name__)
 
 
-def _retrieve_file_ast_parse(filename: pathlib.Path) -> Optional[AST]:
+def retrieve_file_ast_parse(filename: pathlib.Path) -> Optional[AST]:
     return ast3_parse(open(filename).read(), str(filename), "exec")
 
-def _parse_item(item: Union[ClassDef, FunctionDef, Assign]) -> Union[ClassBlock, FunctionBlock, Parameter]:
+
+def parse_item(
+    item: Union[ClassDef, FunctionDef, Assign, Import, ImportFrom], path: ModulePath
+) -> Union[
+    ClassBlock,
+    FunctionBlock,
+    Parameter,
+    List[Union[PackageImportBlock, ModuleImportBlock]],
+]:
     match item:
         case ClassDef():
             return parse_class(item)
         case FunctionDef():
             return parse_function(item)
+        case Import() | ImportFrom():
+            return parse_import(item, path.package, path.module)
         case Assign():
-            raise NotImplementedError
+            pass
 
-def parse_file(filename: pathlib.Path) -> ModuleBlock:
-    ast_tree = _retrieve_file_ast_parse(filename)
-    if ast_tree is None:
-        raise ParseError
-    return ModuleBlock(
-        filename.stem if filename.stem != '__init__' else filename.parents[-1],
-        '', # TODO: Add Relative Name
-        filename,
-        items=list(map(_parse_item, ast_tree.body)),
+
+def _is_root_dir(filename: pathlib.Path) -> bool:
+    assert filename.is_dir()
+    return (
+        (filename / "setup.py").exists()
+        or (filename / "pyproject.toml").exists()
+        or (not (filename / "__init__.py").exists())
     )
-                   
 
 
+def _check_package_name(filename: pathlib.Path) -> str:
+    assert filename.is_dir()
+    if (filename / "setup.py").exists():
+        name = str(
+            subprocess.check_output(
+                ["python3", f"{(filename / 'setup.py').absolute().resolve()}", "--name"]
+            )
+        )
+        return name
+    if (filename / "pyproject.toml").exists():
+        project_metadata = toml.load(filename / "pyproject.toml")
+        return str(project_metadata["name"])
+
+
+@lru_cache()
+def find_rel_package(
+    filename: pathlib.Path, prev_filename: Optional[pathlib.Path] = None
+) -> str:
+    while not filename.is_dir() and not _is_root_dir(filename):
+        return find_rel_package(filename.parent(), filename)
+    if prev_filename is not None:
+        return prev_filename.stem
+    else:
+        _check_package_name(filename)

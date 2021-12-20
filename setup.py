@@ -24,6 +24,7 @@ setup(
     long_description=README,
     long_description_content_type="text/markdown",
     url="https://github.com/lissahyacinth/docoracle",
+    package_data={"docoracle": ["py.typed"]},
     license="MIT",
     packages=["docoracle"],
     requirements=requirements,
