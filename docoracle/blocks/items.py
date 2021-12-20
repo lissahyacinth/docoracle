@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from docoracle.discovery.paths import ModulePath
+from docoracle.discovery.paths import ItemPath, ModulePath
 from docoracle.blocks.parameters import as_base_type
 
 __all__ = ["ClassBlock", "FunctionBlock"]
@@ -22,7 +22,7 @@ from ast import (
 
 if TYPE_CHECKING:
     from docoracle.blocks.module import ReferenceTable, ReferencedModules
-from docoracle.blocks.type_block import TypeBlock
+from docoracle.blocks.type_block import SelfType, TypeBlock
 from docoracle.utils import coalesce, flatten_list, str_coalesce
 from docoracle.parse.parse_parameter import split_parameter_comments
 from docoracle.blocks.parameters import (
@@ -228,7 +228,9 @@ class ClassBlock:
             FunctionBlock(
                 name="__init__",
                 lines=self.lines,
-                signature=Signature(parameters=self.fields, result="Self"),
+                signature=Signature(parameters=self.fields, result=SelfType(
+                    self.name
+                )),
                 comment_block=None,
             )
         )

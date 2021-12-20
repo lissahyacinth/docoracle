@@ -29,6 +29,8 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
+
+
 @dataclass
 class UserDefinedType:
     path: ItemPath
@@ -54,8 +56,11 @@ class NoTypeSpecified:
 
 @dataclass
 class SelfType:
-    pass
+    name: str
 
+    def __hash__(self) -> int:
+        return hash(self.name)
+    
 
 @dataclass
 class TypeBlock:

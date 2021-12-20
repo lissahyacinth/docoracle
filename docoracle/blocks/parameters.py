@@ -8,7 +8,7 @@ import logging
 
 from dataclasses import dataclass
 from typing import *
-from docoracle.blocks.type_block import TypeBlock, UserDefinedType
+from docoracle.blocks.type_block import TypeBlock, UserDefinedType, SelfType
 from ast import (
     Attribute,
     Subscript,
@@ -227,7 +227,7 @@ class Parameter:
 @dataclass
 class Signature:
     parameters: List[Parameter]
-    result: Union[None, BaseType, TypeSubScript, TypeList]
+    result: Union[None, BaseType, TypeSubScript, TypeList, SelfType]
 
     def __hash__(self) -> int:
         return hash(tuple(self.parameters + [self.result]))
@@ -250,5 +250,13 @@ class Signature:
     ):
         for item in self.parameters:
             item.link(module, reference_table, referenced_modules)
-        if self.result is not None:
-            self.result.link(module, reference_table, referenced_modules)
+        match self.result:
+            case str():
+                breakpoint()
+            case SelfType(name):
+                self.result = retrieve_attribute_type(name)
+            case None:
+                pass
+            case _:
+                self.result.link(module, reference_table, referenced_modules)
+            
